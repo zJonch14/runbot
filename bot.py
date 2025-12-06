@@ -77,7 +77,6 @@ async def attack(ctx, metodo: str, ip: str, port: int, tiempo: int):
     except Exception as e:
         await ctx.send(f'Error attack: {e}')
 
-# Comando !methods - Muestra los métodos disponibles
 @bot.command(name='methods', help='Metodos de ataque')
 async def show_methods(ctx):
     methods_info = """
