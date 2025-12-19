@@ -1,4 +1,4 @@
-name: JOJOBOT
+name: DinDinDONBOT
 
 on:
   workflow_dispatch:
@@ -14,7 +14,6 @@ jobs:
       run: |
         echo "Limpiando directorios anteriores..."
         rm -rf BotUDPs 2>/dev/null || true
-        ls -la
     
     - name: 📥 Clonar repositorio
       run: |
@@ -28,24 +27,19 @@ jobs:
         
         cd BotUDPs
         echo "✅ Repositorio clonado en: $(pwd)"
-        echo "Contenido inicial:"
+        echo "📁 Contenido del repositorio:"
         ls -la
     
-    - name: 🐍 Configurar Python 3.11
+    - name: 🐍 Configurar Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
     
-    - name: 🦾 Configurar Go 1.21
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
-    
-    - name: 🔧 Instalar herramientas de compilación
+    - name: 🔧 Instalar herramientas esenciales
       run: |
         echo "Instalando herramientas necesarias..."
         sudo apt-get update
-        sudo apt-get install -y build-essential gcc g++ make libpcap-dev
+        sudo apt-get install -y build-essential gcc g++ make
         echo "✅ Herramientas instaladas"
     
     - name: 📦 Instalar discord.py
@@ -55,117 +49,83 @@ jobs:
         pip install discord.py
         echo "✅ discord.py instalado"
     
-    - name: 📚 Configurar dependencias Go
-      run: |
-        cd BotUDPs
-        echo "Configurando dependencias Go..."
-        
-        # Crear go.mod si no existe
-        if [ ! -f "go.mod" ]; then
-          go mod init bot-udps 2>/dev/null || true
-        fi
-        
-        # Instalar dependencias para raknet.go
-        go get github.com/sandertv/go-raknet 2>/dev/null || echo "⚠  Dependencia go-raknet"
-        go get github.com/sirupsen/logrus 2>/dev/null || echo "⚠  Dependencia logrus"
-        
-        echo "✅ Dependencias Go configuradas"
-    
-    - name: 🛠️ Compilar TODOS los binarios C
+    - name: 🛠️ COMPILAR SOLO ARCHIVOS QUE EXISTEN
       run: |
         cd BotUDPs
         echo "========================================"
-        echo "COMPILANDO TODOS LOS BINARIOS C"
+        echo "COMPILACIÓN INTELIGENTE DE BINARIOS C"
         echo "========================================"
         
-        # Crear lista de métodos C a compilar
-        declare -A c_programs=(
-          ["udp.c"]="UDP Flood"
-          ["udphex.c"]="UDPHEX"
-          ["udppps.c"]="UDPPPS"
-          ["ovh.c"]="OVH Bypass"
-          ["udppayload.c"]="UDP Payload"
-        )
+        echo "📋 Buscando archivos .c en el directorio..."
         
-        compiled=0
-        failed=0
+        # Encontrar TODOS los archivos .c que realmente existen
+        c_files=$(find . -maxdepth 1 -name "*.c" -type f)
         
-        for source_file in "${!c_programs[@]}"; do
+        if [ -z "$c_files" ]; then
+          echo "⚠️  No se encontraron archivos .c para compilar"
+        else
+          echo "✅ Archivos .c encontrados:"
+          echo "$c_files"
           echo ""
-          echo "🔨 ${c_programs[$source_file]} ($source_file)"
           
-          if [ -f "$source_file" ]; then
-            binary="${source_file%.c}"
+          compiled=0
+          for c_file in $c_files; do
+            # Obtener solo el nombre del archivo (sin ./)
+            filename=$(basename "$c_file")
+            binary="${filename%.c}"
             
-            # Compilar según el tipo de archivo
-            if [ "$source_file" == "ovh.c" ]; then
-              # OVH necesita libpcap
-              gcc -O3 -pthread "$source_file" -o "$binary" -lpcap 2>/dev/null
-            else
-              # Otros métodos
-              gcc -O3 -pthread "$source_file" -o "$binary" 2>/dev/null
-            fi
+            echo "🔨 Compilando: $filename → $binary"
             
-            if [ -f "$binary" ]; then
+            # Compilar cada archivo
+            if gcc -O3 -pthread "$filename" -o "$binary" 2>/dev/null; then
               chmod +x "$binary"
               echo "  ✅ $binary compilado exitosamente"
               ((compiled++))
             else
-              echo "  ❌ Error compilando $binary"
-              ((failed++))
+              echo "  ⚠️  Error compilando $binary (posiblemente necesita librerías adicionales)"
             fi
-          else
-            echo "  ❌ $source_file no encontrado"
-            ((failed++))
-          fi
-        done
+            echo ""
+          done
+          
+          echo "========================================"
+          echo "RESUMEN DE COMPILACIÓN:"
+          echo "  ✅ $compiled binarios compilados"
+          echo ""
+          echo "📂 EJECUTABLES DISPONIBLES:"
+          find . -maxdepth 1 -type f -executable ! -name "*.py" ! -name "*.go" ! -name "*.sh" | while read exe; do
+            echo "  ✓ $(basename "$exe")"
+          done || echo "  Ningún ejecutable encontrado"
+        fi
         
-        echo ""
-        echo "========================================"
-        echo "RESULTADO COMPILACIÓN:"
-        echo "  ✅ $compiled compilados correctamente"
-        echo "  ❌ $failed con errores"
-        echo ""
-        echo "EJECUTABLES DISPONIBLES:"
-        find . -maxdepth 1 -type f -executable ! -name "*.py" ! -name "*.go" ! -name "*.sh" | xargs -I {} basename {} 2>/dev/null || echo "  Ninguno"
         echo "========================================"
     
-    - name: 🔍 Verificar scripts Go
+    - name: 🦾 Configurar Go (solo si hay archivos .go)
       run: |
         cd BotUDPs
-        echo "========================================"
-        echo "VERIFICANDO SCRIPTS GO"
-        echo "========================================"
         
-        # Verificar udpflood.go
-        if [ -f "udpflood.go" ]; then
-          echo "✅ udpflood.go encontrado"
-          # Probar compilación
-          if go build -o /tmp/udpflood_test udpflood.go 2>/dev/null; then
-            echo "  ✓ Compila correctamente"
-            rm -f /tmp/udpflood_test
-          else
-            echo "  ⚠  Posibles errores de compilación"
+        # Verificar si hay archivos .go
+        if ls *.go >/dev/null 2>&1; then
+          echo "🦾 Configurando Go para scripts .go..."
+          
+          # Instalar Go si no está
+          if ! command -v go &> /dev/null; then
+            echo "Instalando Go..."
+            sudo apt-get install -y golang-go
           fi
-        else
-          echo "❌ udpflood.go NO encontrado"
-        fi
-        
-        # Verificar raknet.go
-        if [ -f "raknet.go" ]; then
-          echo "✅ raknet.go encontrado"
-          # Probar compilación
-          if go build -o /tmp/raknet_test raknet.go 2>/dev/null; then
-            echo "  ✓ Compila correctamente"
-            rm -f /tmp/raknet_test
-          else
-            echo "  ⚠  Posibles errores de compilación"
+          
+          # Configurar módulo Go
+          if [ ! -f "go.mod" ]; then
+            go mod init bot-udps 2>/dev/null || true
           fi
+          
+          # Intentar instalar dependencias (opcional, no crítico)
+          echo "Configurando dependencias Go (opcional)..."
+          go get github.com/sandertv/go-raknet 2>/dev/null || echo "⚠️  go-raknet opcional"
+          
+          echo "✅ Go configurado"
         else
-          echo "❌ raknet.go NO encontrado"
+          echo "⚠️  No se encontraron archivos .go, omitiendo configuración de Go"
         fi
-        
-        echo "========================================"
     
     - name: 🔐 Configurar token DESDE SECRET KEYS
       env:
@@ -178,43 +138,25 @@ jobs:
         
         if [ -z "$DISCORD_TOKEN" ]; then
           echo ""
-          echo "❌❌❌ ERROR CRÍTICO ❌❌❌"
-          echo "NO SE ENCONTRÓ EL SECRET 'KEYS'"
+          echo "❌ ERROR: NO SE ENCONTRÓ EL SECRET 'KEYS'"
           echo ""
           echo "Para solucionar:"
-          echo "1. Ve a tu repositorio en GitHub"
-          echo "2. Haz clic en 'Settings'"
-          echo "3. Selecciona 'Secrets and variables' → 'Actions'"
-          echo "4. Haz clic en 'New repository secret'"
-          echo "5. Nombre: KEYS"
-          echo "6. Valor: [PEGA TU TOKEN DE BOT DE DISCORD AQUÍ]"
-          echo "7. Haz clic en 'Add secret'"
+          echo "1. Settings → Secrets and variables → Actions"
+          echo "2. New repository secret"
+          echo "3. Nombre: KEYS"
+          echo "4. Valor: [TU TOKEN DE BOT DE DISCORD]"
+          echo "5. Add secret"
           echo ""
-          echo "Sin este paso, el bot NO puede iniciar."
           exit 1
         fi
         
-        # Validar formato básico del token
-        TOKEN_LENGTH=${#DISCORD_TOKEN}
-        if [ $TOKEN_LENGTH -lt 50 ]; then
-          echo "⚠  ADVERTENCIA: Token muy corto ($TOKEN_LENGTH caracteres)"
-          echo "Un token válido de Discord suele tener ~59 caracteres"
-        fi
-        
-        # Guardar token en token.txt
+        # Guardar token
         echo "$DISCORD_TOKEN" > token.txt
         
-        # Verificar que se guardó correctamente
-        if [ -f "token.txt" ]; then
-          ACTUAL_LENGTH=$(wc -c < token.txt | tr -d ' ')
-          echo ""
-          echo "✅ TOKEN CONFIGURADO EXITOSAMENTE"
-          echo "   Archivo: token.txt"
-          echo "   Tamaño: $ACTUAL_LENGTH caracteres"
-          echo "   Vista previa: $(head -c 15 token.txt)..."
-          
-          # Proteger el archivo
-          chmod 600 token.txt
+        # Verificar
+        if [ -f "token.txt" ] && [ -s "token.txt" ]; then
+          echo "✅ Token guardado en token.txt"
+          echo "   Tamaño: $(wc -c < token.txt) caracteres"
         else
           echo "❌ ERROR: No se pudo crear token.txt"
           exit 1
@@ -222,123 +164,99 @@ jobs:
         
         echo "========================================"
     
-    - name: 📋 Verificar estructura final
+    - name: 📋 Verificar estado final
       run: |
         cd BotUDPs
         echo "========================================"
-        echo "ESTRUCTURA FINAL DEL PROYECTO"
+        echo "VERIFICACIÓN FINAL"
         echo "========================================"
-        echo "Directorio: $(pwd)"
+        echo "📂 Directorio: $(pwd)"
         echo ""
         
-        echo "📄 ARCHIVOS PRINCIPALES:"
-        echo "-----------------------"
-        ls -la bot.py token.txt 2>/dev/null || echo "  ❌ Faltan archivos críticos"
+        echo "📄 Archivos críticos:"
+        if [ -f "bot.py" ]; then
+          echo "  ✅ bot.py"
+        else
+          echo "  ❌ bot.py (FALTA)"
+        fi
+        
+        if [ -f "token.txt" ]; then
+          echo "  ✅ token.txt"
+        else
+          echo "  ❌ token.txt (FALTA)"
+        fi
         echo ""
         
-        echo "⚙️ BINARIOS C COMPILADOS:"
-        echo "-----------------------"
-        find . -maxdepth 1 -type f -executable ! -name "*.py" ! -name "*.go" ! -name "*.sh" | while read file; do
-          size=$(wc -c < "$file" 2>/dev/null | awk '{print $1}')
-          echo "  ✓ $(basename "$file") ($size bytes)"
-        done
+        echo "⚙️ Ejecutables disponibles:"
+        executables=$(find . -maxdepth 1 -type f -executable ! -name "*.py" ! -name "*.go" ! -name "*.sh" 2>/dev/null | wc -l)
+        if [ "$executables" -gt 0 ]; then
+          find . -maxdepth 1 -type f -executable ! -name "*.py" ! -name "*.go" ! -name "*.sh" | while read exe; do
+            size=$(stat -c%s "$exe" 2>/dev/null || echo "?")
+            echo "  ✓ $(basename "$exe") (${size} bytes)"
+          done
+        else
+          echo "  ⚠️  No hay ejecutables compilados"
+        fi
+        echo ""
+        
+        echo "🦾 Scripts Go:"
+        if ls *.go >/dev/null 2>&1; then
+          ls *.go | while read go_file; do
+            echo "  ✓ $go_file"
+          done
+        else
+          echo "  ⚠️  No hay scripts Go"
+        fi
         
         echo ""
-        echo "🦾 SCRIPTS GO:"
-        echo "-------------"
-        ls -la *.go 2>/dev/null | awk '{print "  " $9}' || echo "  No hay scripts Go"
-        
-        echo ""
-        echo "🔧 ARCHIVOS FUENTE C:"
-        echo "-------------------"
-        ls -la *.c 2>/dev/null | awk '{print "  " $9}' || echo "  No hay archivos .c"
-        
-        echo ""
-        echo "✅ VERIFICACIÓN COMPLETADA"
+        echo "✅ Verificación completada"
         echo "========================================"
     
-    - name: 🚀 EJECUTAR bot.py CONTINUAMENTE
+    - name: 🚀 EJECUTAR bot.py
       run: |
         cd BotUDPs
         echo "========================================"
-        echo "🚀 INICIANDO EJECUCIÓN DEL BOT"
+        echo "🚀 INICIANDO BOT UDP"
         echo "========================================"
-        echo "Hora de inicio: $(date)"
+        echo "📅 Hora de inicio: $(date)"
+        echo "🔧 Métodos disponibles según archivos:"
         echo ""
-        echo "📋 ESPECIFICACIONES:"
-        echo "  • Repositorio: zJonch14/BotUDPs (clonado)"
-        echo "  • Token: Configurado desde secret 'KEYS'"
-        echo "  • Modo: Sigiloso (0 mensajes en Discord)"
-        echo "  • Duración: Hasta que GitHub detenga el runner (~6h)"
+        
+        # Mostrar métodos basados en archivos existentes
+        if [ -f "udp" ] || [ -f "udp.c" ]; then echo "  !attack udp"; fi
+        if [ -f "udphex" ] || [ -f "udphex.c" ]; then echo "  !attack udphex"; fi
+        if [ -f "udppps" ] || [ -f "udppps.c" ]; then echo "  !attack udppps"; fi
+        if [ -f "ovh" ] || [ -f "ovh.c" ]; then echo "  !attack ovh"; fi
+        if [ -f "udpflood.go" ]; then echo "  !attack udpflood"; fi
+        if [ -f "raknet.go" ]; then echo "  !attack raknet"; fi
+        if [ -f "udppayload" ] || [ -f "udppayload.c" ]; then echo "  !attack udppayload"; fi
+        
         echo ""
-        echo "🎮 MÉTODOS DISPONIBLES:"
-        echo "  !attack udp [IP] [PUERTO] [TIEMPO]"
-        echo "  !attack udphex [IP] [PUERTO] [TIEMPO]"
-        echo "  !attack udppps [IP] [PUERTO] [TIEMPO]"
-        echo "  !attack ovh [IP] [PUERTO] [TIEMPO]"
-        echo "  !attack raknet [IP] [PUERTO] [TIEMPO]"
-        echo "  !attack udpflood [IP] [PUERTO] [TIEMPO]"
-        echo "  !attack udppayload [IP] [PUERTO] [TIEMPO] [PAYLOAD]"
-        echo ""
-        echo "⚠️  IMPORTANTE:"
-        echo "  • El bot NO enviará mensajes a Discord"
-        echo "  • Solo registrará actividad en esta consola"
-        echo "  • Se ejecutará hasta el límite de GitHub"
-        echo ""
+        echo "⚠️  MODO SIGILOSO: 0 mensajes en Discord"
+        echo "📝 Logs solo en esta consola"
+        echo "⏰ Duración: Hasta límite de GitHub (~6h)"
         echo "========================================"
         
-        # Verificación final antes de ejecutar
+        # Verificaciones finales
         if [ ! -f "bot.py" ]; then
-          echo "❌ ERROR CRÍTICO: bot.py no encontrado"
+          echo "❌ ERROR: bot.py no encontrado"
           exit 1
         fi
         
         if [ ! -f "token.txt" ] || [ ! -s "token.txt" ]; then
-          echo "❌ ERROR CRÍTICO: token.txt no válido"
+          echo "❌ ERROR: token.txt inválido"
           exit 1
         fi
         
         echo ""
-        echo "✅ TODO CONFIGURADO CORRECTAMENTE"
-        echo "⚡ INICIANDO BOT.PY..."
+        echo "✅ INICIANDO EJECUCIÓN..."
         echo ""
-        echo "--------------------------------------------------"
         
-        # EJECUTAR EL BOT INDEFINIDAMENTE
-        # (Se detendrá solo cuando GitHub cancele el job)
+        # Ejecutar bot (se detendrá solo cuando GitHub lo cancele)
         python3 bot.py
         
-        # Solo llegará aquí si el bot falla antes del timeout
-        EXIT_CODE=$?
         echo ""
-        echo "--------------------------------------------------"
-        echo ""
-        echo "⚠️  EL BOT SE DETUVO ANTES DE LO ESPERADO"
+        echo "========================================"
+        echo "BOT DETENIDO"
         echo "⏰ Hora: $(date)"
-        echo "📊 Código de salida: $EXIT_CODE"
-        
-        echo "========================================"
-    
-    - name: 📝 Reporte final de ejecución
-      if: always()
-      run: |
-        echo "========================================"
-        echo "📊 REPORTE FINAL DE EJECUCIÓN"
-        echo "========================================"
-        echo "Workflow: ${{ github.workflow }}"
-        echo "Run ID: ${{ github.run_id }}"
-        echo "Repositorio fuente: zJonch14/BotUDPs"
-        echo "Estado final: ${{ job.status }}"
-        echo "Hora: $(date)"
-        echo ""
-        
-        if [ -d "BotUDPs" ]; then
-          cd BotUDPs
-          echo "📁 CONTENIDO FINAL DEL DIRECTORIO:"
-          echo "----------------------------------"
-          ls -la 2>/dev/null | head -20 || echo "No se puede acceder al directorio"
-        fi
-        
-        echo ""
-        echo "✅ PROCESO COMPLETADO"
         echo "========================================"
