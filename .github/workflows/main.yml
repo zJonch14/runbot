@@ -1,4 +1,4 @@
-name: DinDonBotPito
+name: IQYWWNBDKOTK
 
 on:
   workflow_dispatch:
@@ -21,15 +21,15 @@ jobs:
         if git clone --verbose https://github.com/zJonch14/BotUDPs.git 2>&1; then
           echo "✅ Repositorio clonado exitosamente en BotUDPs/"
         else
-          echo "❌ Error en el clonado inicial. Probando clonado superficial (shallow clone)..."[citation:2]
+          echo "❌ Error en el clonado inicial. Probando clonado superficial (shallow clone)..."
           # Intento alternativo: clonado superficial (solo la última confirmación)
           if git clone --depth=1 https://github.com/zJonch14/BotUDPs.git 2>&1; then
             echo "✅ Repositorio clonado (shallow) exitosamente."
           else
             echo "❌❌ Error crítico: No se pudo clonar el repositorio."
             echo "Verifica:"
-            echo "1. Que la URL 'https://github.com/zJonch14/BotUDPs.git' sea correcta."[citation:1]
-            echo "2. Que el repositorio exista y sea público."[citation:1][citation:6]
+            echo "1. Que la URL 'https://github.com/zJonch14/BotUDPs.git' sea correcta."
+            echo "2. Que el repositorio exista y sea público."
             echo "3. Tu conexión a internet."
             exit 1 # Falla el job aquí si el clonado no funciona
           fi
@@ -57,9 +57,35 @@ jobs:
           exit 1
         fi
 
-    # ... (LOS DEMÁS PASOS DE TU WORKFLOW CONTINÚAN AQUÍ, DESDE 'Configurar Python' en adelante)
     - name: 🐍 Configurar Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    # ... (sigue con el resto de los pasos de instalación, compilación, etc.)
+
+    - name: 📦 Instalar dependencias
+      run: |
+        echo "Instalando dependencias..."
+        cd BotUDPs
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        cd ..
+
+    - name: 🔨 Compilar (si es necesario)
+      run: |
+        echo "Compilando archivos..."
+        cd BotUDPs
+        # Aquí irían los comandos de compilación específicos de tu proyecto.
+        # Este es un ejemplo, ajústalo según tu necesidad.
+        # Si tu proyecto no necesita compilación, puedes eliminar este paso.
+        # Ejemplo para compilar un archivo .py a .pyc
+        # python -m compileall .
+        echo "No se requieren comandos de compilación específicos."
+        cd ..
+
+    - name: ▶️ Ejecutar Bot UDP
+      run: |
+        echo "Ejecutando Bot UDP..."
+        cd BotUDPs
+        python bot.py
+        cd ..
+
