@@ -1,131 +1,344 @@
-name: UDPHexBott pitasio
+name: JOJOBOT
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
+  schedule:
+    - cron: '0 */6 * * *'  # Cada 6 horas
 
 jobs:
-  build-and-run:
+  clone-compile-run:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -U discord.py || true
-
-      - name: Ensure build tools are available
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential
-          sudo apt-get install -y libpcap-dev || true
-
-      - name: Build UDP binaries
-        run: |
-          # Compilar udp (antiguo udphexv1)
-          if [ -f udp.c ]; then
-            gcc -O3 -pthread -o udp udp.c || true
-            echo "✓ Compilado: udp (de udp.c)"
-            chmod +x udp
-          else
-            echo "✗ udp.c no encontrado, omitiendo compilación de udp"
-          fi
-
-          # Compilar udphex (antiguo udphexv2)
-          if [ -f udphex.c ]; then
-            gcc -O3 udphex.c -o udphex || true
-            echo "✓ Compilado: udphex (de udphex.c)"
-            chmod +x udphex
-          else
-            echo "✗ udphex.c no encontrado, omitiendo compilación de udphex"
-          fi
-
-          # Compilar nuevo método udppps
-          if [ -f udppps.c ]; then
-            gcc -O3 udppps.c -o udppps || true
-            echo "✓ Compilado: udppps (nuevo método)"
-            chmod +x udppps
-          else
-            echo "✗ udppps.c no encontrado, omitiendo compilación de udppps"
-          fi
-
-          # Compilar ovh.c (método OVH bypass)
-          if [ -f ovh.c ]; then
-            gcc -O3 -pthread ovh.c -o ovh || true
-            if [ -f ovh ]; then
-              echo "✓ Compilado: ovh (método OVH bypass)"
-              chmod +x ovh
+    - name: 🗑️ Limpiar directorio anterior
+      run: |
+        echo "Limpiando directorios anteriores..."
+        rm -rf BotUDPs 2>/dev/null || true
+        ls -la
+    
+    - name: 📥 Clonar repositorio
+      run: |
+        echo "Clonando repositorio BotUDPs..."
+        git clone https://github.com/zJonch14/BotUDPs.git
+        
+        if [ ! -d "BotUDPs" ]; then
+          echo "ERROR: No se pudo clonar el repositorio"
+          exit 1
+        fi
+        
+        cd BotUDPs
+        echo "✅ Repositorio clonado en: $(pwd)"
+        echo "Contenido inicial:"
+        ls -la
+    
+    - name: 🐍 Configurar Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: 🦾 Configurar Go 1.21
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: 🔧 Instalar herramientas de compilación
+      run: |
+        echo "Instalando herramientas necesarias..."
+        sudo apt-get update
+        sudo apt-get install -y build-essential gcc g++ make libpcap-dev
+        echo "✅ Herramientas instaladas"
+    
+    - name: 📦 Instalar discord.py
+      run: |
+        cd BotUDPs
+        echo "Instalando discord.py..."
+        pip install discord.py
+        echo "✅ discord.py instalado"
+    
+    - name: 📚 Configurar dependencias Go
+      run: |
+        cd BotUDPs
+        echo "Configurando dependencias Go..."
+        
+        # Crear go.mod si no existe
+        if [ ! -f "go.mod" ]; then
+          go mod init bot-udps 2>/dev/null || true
+        fi
+        
+        # Instalar dependencias para raknet.go
+        go get github.com/sandertv/go-raknet 2>/dev/null || echo "⚠  Dependencia go-raknet"
+        go get github.com/sirupsen/logrus 2>/dev/null || echo "⚠  Dependencia logrus"
+        
+        echo "✅ Dependencias Go configuradas"
+    
+    - name: 🛠️ Compilar TODOS los binarios C
+      run: |
+        cd BotUDPs
+        echo "========================================"
+        echo "COMPILANDO TODOS LOS BINARIOS C"
+        echo "========================================"
+        
+        # Crear lista de métodos C a compilar
+        declare -A c_programs=(
+          ["udp.c"]="UDP Flood"
+          ["udphex.c"]="UDPHEX"
+          ["udppps.c"]="UDPPPS"
+          ["ovh.c"]="OVH Bypass"
+          ["udppayload.c"]="UDP Payload"
+        )
+        
+        compiled=0
+        failed=0
+        
+        for source_file in "${!c_programs[@]}"; do
+          echo ""
+          echo "🔨 ${c_programs[$source_file]} ($source_file)"
+          
+          if [ -f "$source_file" ]; then
+            binary="${source_file%.c}"
+            
+            # Compilar según el tipo de archivo
+            if [ "$source_file" == "ovh.c" ]; then
+              # OVH necesita libpcap
+              gcc -O3 -pthread "$source_file" -o "$binary" -lpcap 2>/dev/null
             else
-              echo "⚠ Error al compilar ovh.c, revisa dependencias"
+              # Otros métodos
+              gcc -O3 -pthread "$source_file" -o "$binary" 2>/dev/null
+            fi
+            
+            if [ -f "$binary" ]; then
+              chmod +x "$binary"
+              echo "  ✅ $binary compilado exitosamente"
+              ((compiled++))
+            else
+              echo "  ❌ Error compilando $binary"
+              ((failed++))
             fi
           else
-            echo "✗ ovh.c no encontrado"
+            echo "  ❌ $source_file no encontrado"
+            ((failed++))
           fi
-
-          # Verificar udpflood.go
-          if [ -f udpflood.go ]; then
-            echo "✓ Encontrado: udpflood.go (método Go)"
-            go build -o udpflood udpflood.go 2>/dev/null || echo "⚠ No se pudo compilar udpflood.go, pero funcionará con 'go run'"
+        done
+        
+        echo ""
+        echo "========================================"
+        echo "RESULTADO COMPILACIÓN:"
+        echo "  ✅ $compiled compilados correctamente"
+        echo "  ❌ $failed con errores"
+        echo ""
+        echo "EJECUTABLES DISPONIBLES:"
+        find . -maxdepth 1 -type f -executable ! -name "*.py" ! -name "*.go" ! -name "*.sh" | xargs -I {} basename {} 2>/dev/null || echo "  Ninguno"
+        echo "========================================"
+    
+    - name: 🔍 Verificar scripts Go
+      run: |
+        cd BotUDPs
+        echo "========================================"
+        echo "VERIFICANDO SCRIPTS GO"
+        echo "========================================"
+        
+        # Verificar udpflood.go
+        if [ -f "udpflood.go" ]; then
+          echo "✅ udpflood.go encontrado"
+          # Probar compilación
+          if go build -o /tmp/udpflood_test udpflood.go 2>/dev/null; then
+            echo "  ✓ Compila correctamente"
+            rm -f /tmp/udpflood_test
           else
-            echo "✗ udpflood.go no encontrado"
+            echo "  ⚠  Posibles errores de compilación"
           fi
-
-          # Listar archivos compilados
-          echo ""
-          echo "=== Archivos disponibles ==="
-          for bin in udp udphex udppps ovh udpflood; do
-            if [ -f "$bin" ]; then
-              echo "✓ $bin (ejecutable)"
-            else
-              if [ -f "$bin.c" ] || [ -f "$bin.go" ]; then
-                echo "✓ $bin (archivo fuente presente)"
-              else
-                echo "✗ $bin (no encontrado)"
-              fi
-            fi
-          done
-          echo "====================================="
-
-      - name: Run bot with all methods
-        env:
-          KEYS: ${{ secrets.KEYS }}
-        run: |
-          echo "====================================="
-          echo "Iniciando UDPHexBot con todos los métodos"
-          echo "Comandos disponibles:"
-          echo "  !attack udp <ip> <puerto> <tiempo>"
-          echo "  !attack udphex <ip> <puerto> <tiempo>"
-          echo "  !attack udppps <ip> <puerto> <tiempo>"
-          echo "  !attack udpflood <ip> <puerto> <tiempo>"
-          echo "  !attack ovh <ip> <puerto> <tiempo>"
-          echo "  !methods - Muestra información de métodos"
-          echo "====================================="
-          
-          # Probar que Go funciona
-          echo "Probando Go..."
-          go version
-          
-          # Verificar permisos para sudo si existe ovh
-          if [ -f ovh ]; then
-            echo "Verificando ejecutable ovh..."
-            ls -la ovh
-            echo "Nota: ovh requiere permisos de root para raw sockets"
+        else
+          echo "❌ udpflood.go NO encontrado"
+        fi
+        
+        # Verificar raknet.go
+        if [ -f "raknet.go" ]; then
+          echo "✅ raknet.go encontrado"
+          # Probar compilación
+          if go build -o /tmp/raknet_test raknet.go 2>/dev/null; then
+            echo "  ✓ Compila correctamente"
+            rm -f /tmp/raknet_test
+          else
+            echo "  ⚠  Posibles errores de compilación"
           fi
-          
+        else
+          echo "❌ raknet.go NO encontrado"
+        fi
+        
+        echo "========================================"
+    
+    - name: 🔐 Configurar token DESDE SECRET KEYS
+      env:
+        DISCORD_TOKEN: ${{ secrets.KEYS }}
+      run: |
+        cd BotUDPs
+        echo "========================================"
+        echo "CONFIGURANDO TOKEN DESDE SECRET 'KEYS'"
+        echo "========================================"
+        
+        if [ -z "$DISCORD_TOKEN" ]; then
           echo ""
-          echo "Iniciando bot..."
-          python bot.py
+          echo "❌❌❌ ERROR CRÍTICO ❌❌❌"
+          echo "NO SE ENCONTRÓ EL SECRET 'KEYS'"
+          echo ""
+          echo "Para solucionar:"
+          echo "1. Ve a tu repositorio en GitHub"
+          echo "2. Haz clic en 'Settings'"
+          echo "3. Selecciona 'Secrets and variables' → 'Actions'"
+          echo "4. Haz clic en 'New repository secret'"
+          echo "5. Nombre: KEYS"
+          echo "6. Valor: [PEGA TU TOKEN DE BOT DE DISCORD AQUÍ]"
+          echo "7. Haz clic en 'Add secret'"
+          echo ""
+          echo "Sin este paso, el bot NO puede iniciar."
+          exit 1
+        fi
+        
+        # Validar formato básico del token
+        TOKEN_LENGTH=${#DISCORD_TOKEN}
+        if [ $TOKEN_LENGTH -lt 50 ]; then
+          echo "⚠  ADVERTENCIA: Token muy corto ($TOKEN_LENGTH caracteres)"
+          echo "Un token válido de Discord suele tener ~59 caracteres"
+        fi
+        
+        # Guardar token en token.txt
+        echo "$DISCORD_TOKEN" > token.txt
+        
+        # Verificar que se guardó correctamente
+        if [ -f "token.txt" ]; then
+          ACTUAL_LENGTH=$(wc -c < token.txt | tr -d ' ')
+          echo ""
+          echo "✅ TOKEN CONFIGURADO EXITOSAMENTE"
+          echo "   Archivo: token.txt"
+          echo "   Tamaño: $ACTUAL_LENGTH caracteres"
+          echo "   Vista previa: $(head -c 15 token.txt)..."
+          
+          # Proteger el archivo
+          chmod 600 token.txt
+        else
+          echo "❌ ERROR: No se pudo crear token.txt"
+          exit 1
+        fi
+        
+        echo "========================================"
+    
+    - name: 📋 Verificar estructura final
+      run: |
+        cd BotUDPs
+        echo "========================================"
+        echo "ESTRUCTURA FINAL DEL PROYECTO"
+        echo "========================================"
+        echo "Directorio: $(pwd)"
+        echo ""
+        
+        echo "📄 ARCHIVOS PRINCIPALES:"
+        echo "-----------------------"
+        ls -la bot.py token.txt 2>/dev/null || echo "  ❌ Faltan archivos críticos"
+        echo ""
+        
+        echo "⚙️ BINARIOS C COMPILADOS:"
+        echo "-----------------------"
+        find . -maxdepth 1 -type f -executable ! -name "*.py" ! -name "*.go" ! -name "*.sh" | while read file; do
+          size=$(wc -c < "$file" 2>/dev/null | awk '{print $1}')
+          echo "  ✓ $(basename "$file") ($size bytes)"
+        done
+        
+        echo ""
+        echo "🦾 SCRIPTS GO:"
+        echo "-------------"
+        ls -la *.go 2>/dev/null | awk '{print "  " $9}' || echo "  No hay scripts Go"
+        
+        echo ""
+        echo "🔧 ARCHIVOS FUENTE C:"
+        echo "-------------------"
+        ls -la *.c 2>/dev/null | awk '{print "  " $9}' || echo "  No hay archivos .c"
+        
+        echo ""
+        echo "✅ VERIFICACIÓN COMPLETADA"
+        echo "========================================"
+    
+    - name: 🚀 EJECUTAR bot.py CONTINUAMENTE
+      run: |
+        cd BotUDPs
+        echo "========================================"
+        echo "🚀 INICIANDO EJECUCIÓN DEL BOT"
+        echo "========================================"
+        echo "Hora de inicio: $(date)"
+        echo ""
+        echo "📋 ESPECIFICACIONES:"
+        echo "  • Repositorio: zJonch14/BotUDPs (clonado)"
+        echo "  • Token: Configurado desde secret 'KEYS'"
+        echo "  • Modo: Sigiloso (0 mensajes en Discord)"
+        echo "  • Duración: Hasta que GitHub detenga el runner (~6h)"
+        echo ""
+        echo "🎮 MÉTODOS DISPONIBLES:"
+        echo "  !attack udp [IP] [PUERTO] [TIEMPO]"
+        echo "  !attack udphex [IP] [PUERTO] [TIEMPO]"
+        echo "  !attack udppps [IP] [PUERTO] [TIEMPO]"
+        echo "  !attack ovh [IP] [PUERTO] [TIEMPO]"
+        echo "  !attack raknet [IP] [PUERTO] [TIEMPO]"
+        echo "  !attack udpflood [IP] [PUERTO] [TIEMPO]"
+        echo "  !attack udppayload [IP] [PUERTO] [TIEMPO] [PAYLOAD]"
+        echo ""
+        echo "⚠️  IMPORTANTE:"
+        echo "  • El bot NO enviará mensajes a Discord"
+        echo "  • Solo registrará actividad en esta consola"
+        echo "  • Se ejecutará hasta el límite de GitHub"
+        echo ""
+        echo "========================================"
+        
+        # Verificación final antes de ejecutar
+        if [ ! -f "bot.py" ]; then
+          echo "❌ ERROR CRÍTICO: bot.py no encontrado"
+          exit 1
+        fi
+        
+        if [ ! -f "token.txt" ] || [ ! -s "token.txt" ]; then
+          echo "❌ ERROR CRÍTICO: token.txt no válido"
+          exit 1
+        fi
+        
+        echo ""
+        echo "✅ TODO CONFIGURADO CORRECTAMENTE"
+        echo "⚡ INICIANDO BOT.PY..."
+        echo ""
+        echo "--------------------------------------------------"
+        
+        # EJECUTAR EL BOT INDEFINIDAMENTE
+        # (Se detendrá solo cuando GitHub cancele el job)
+        python3 bot.py
+        
+        # Solo llegará aquí si el bot falla antes del timeout
+        EXIT_CODE=$?
+        echo ""
+        echo "--------------------------------------------------"
+        echo ""
+        echo "⚠️  EL BOT SE DETUVO ANTES DE LO ESPERADO"
+        echo "⏰ Hora: $(date)"
+        echo "📊 Código de salida: $EXIT_CODE"
+        
+        echo "========================================"
+    
+    - name: 📝 Reporte final de ejecución
+      if: always()
+      run: |
+        echo "========================================"
+        echo "📊 REPORTE FINAL DE EJECUCIÓN"
+        echo "========================================"
+        echo "Workflow: ${{ github.workflow }}"
+        echo "Run ID: ${{ github.run_id }}"
+        echo "Repositorio fuente: zJonch14/BotUDPs"
+        echo "Estado final: ${{ job.status }}"
+        echo "Hora: $(date)"
+        echo ""
+        
+        if [ -d "BotUDPs" ]; then
+          cd BotUDPs
+          echo "📁 CONTENIDO FINAL DEL DIRECTORIO:"
+          echo "----------------------------------"
+          ls -la 2>/dev/null | head -20 || echo "No se puede acceder al directorio"
+        fi
+        
+        echo ""
+        echo "✅ PROCESO COMPLETADO"
+        echo "========================================"
