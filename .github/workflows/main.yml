@@ -1,4 +1,4 @@
-name: ANDAHIJODEEPU
+name: PORQUENOANDAAAA
 
 on:
   workflow_dispatch:
@@ -103,8 +103,8 @@ jobs:
         echo ""
         echo "📂 EJECUTABLES DISPONIBLES:"
         find . -maxdepth 1 -type f -executable ! -name "*.py" ! -name "*.go" ! -name "*.sh" | while read exe; do
-          size=$(stat -c%s "$exe" 2>/dev/null || echo "?"")
-          echo "  ✓ $(basename "$exe") (${size} bytes)"
+          size=$(stat -c%s "$exe" 2>/dev/null || echo "?")
+          echo "  ✓ $(basename "$exe") \(${size} bytes\)"
         done || echo "  Ningún ejecutable encontrado"
 
         # Reactivar exit-on-error
