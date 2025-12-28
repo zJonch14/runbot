@@ -1,4 +1,4 @@
-name: Bot Bot BotttaaaBBB
+name: Bot Bot BotttJEJEJEJE
 
 on:
   workflow_dispatch:
@@ -130,79 +130,70 @@ jobs:
           echo "⚠️  No hay archivos .go, omitiendo Go"
         fi
 
-    - name: 🔐 Configurar token DESDE SECRET KEYS
+    - name: Prepare environment for https-request
+      run: |
+          echo "=== Preparando entorno para https-request ==="
+          sudo python3 install.py
+
+    - name: 🚀 EJECUTAR BOT CON KEYS
       env:
-        KEYS: ${{ secrets.KEYS }}
+        DISCORD_TOKEN: ${{ secrets.KEYS }}  # ¡IMPORTANTE! Esto pasa KEYS al bot.py
       run: |
         cd BotUDPs
+        echo "========================================"
+        echo "🤖 INICIANDO BOT UDP/TCP/AMP/L7"
+        echo "========================================"
 
-        if [ -z "$KEYS" ]; then
-          echo "❌ ERROR: Secret 'DISCORD_TOKEN' no configurado"
-          echo "Configúralo en Settings → Secrets → Actions → DISCORD_TOKEN"
+        # DEBUG: Verificar que KEYS se recibió
+        echo "🔍 VERIFICANDO CONFIGURACIÓN:"
+        echo "   - Directorio: $(pwd)"
+        echo "   - Archivo bot.py: $(ls -la bot.py 2>/dev/null && echo "✅" || echo "❌")"
+        echo "   - KEYS recibido: $([ -n "$DISCORD_TOKEN" ] && echo "✅ (${#DISCORD_TOKEN} chars)" || echo "❌ VACÍO")"
+
+        if [ -z "$DISCORD_TOKEN" ]; then
+          echo ""
+          echo "❌❌❌ ERROR: DISCORD_TOKEN está VACÍO ❌❌❌"
+          echo ""
+          echo "SOLUCIÓN INMEDIATA:"
+          echo "1. El secret 'KEYS' NO está configurado o está vacío"
+          echo "2. Ve a: Settings → Secrets and variables → Actions"
+          echo "3. Haz clic en 'KEYS' para verificar su contenido"
+          echo "4. Si está vacío, edítalo y pega tu token"
+          echo ""
+          echo "Token de Discord debe tener ~59 caracteres como:"
+          echo "pito"
           exit 1
         fi
 
-    - name: Install Node.js
-      run: |
-          cd BotUDPs
-          sudo apt-get update
-          sudo apt-get install -y nodejs npm
-          sudo npm install -g request
+        # Verificar formato del token
+        if [ ${#DISCORD_TOKEN} -lt 50 ]; then
+          echo "⚠️  ADVERTENCIA: Token muy corto (${#DISCORD_TOKEN} chars)"
+          echo "   Debe tener ~59 caracteres mínimo"
+        fi
 
-    - name: 🚀 EJECUTAR bot.py
-      run: |
-        cd BotUDPs
-        echo "========================================"
-        echo "🚀 INICIANDO BOT UDP"
-        echo "========================================"
-        echo "📅 Hora: $(date)"
         echo ""
+        echo "✅ CONFIGURACIÓN CORRECTA"
+        echo "   Token recibido: ${#DISCORD_TOKEN} caracteres"
+        echo "   Vista previa: ${DISCORD_TOKEN:0:15}..."
+        echo ""
+        echo "🎮 MÉTODOS DISPONIBLES:"
 
-        # Verificar que tenemos lo mínimo necesario
-        if [ ! -f "bot.py" ]; then
-          echo "❌ ERROR: bot.py no encontrado"
-          exit 1
-        fi
-
-        if [ ! -f "gravitus.js" ]; then
-          echo "❌ ERROR: gravitus.js no encontrado"
-          exit 1
-        fi
-
-        if [ ! -f "proxy.txt" ]; then
-          echo "❌ ERROR: proxy.txt no encontrado"
-          exit 1
-        fi
-
-        echo "✅ Archivos críticos verificados"
-        echo "🎮 Métodos disponibles según ejecutables:"
-
-        # Mostrar métodos basados en ejecutables disponibles
-        for method in udp udphex udppps ovh tcp udppayload udpbypass; do
-          if [ -f "$method" ]; then
-            echo "  !attack $method [IP] [PUERTO] [TIEMPO]"
-          fi
+        # Mostrar métodos según ejecutables
+        for method in udp udphex udppps ovh udppayload udpbypass tcp tcp-syn httpsrequest; do
+          [ -f "$method" ] && echo "   • $method"
         done
 
-        echo "  !attack httpsrequest [IP] [PUERTO] [TIEMPO]"
-
-        if [ -f "udpflood.go" ]; then
-          echo "  !attack udpflood [IP] [PUERTO] [TIEMPO]"
-        fi
-
-        if [ -f "raknet.go" ]; then
-          echo "  !attack raknet [IP] [PUERTO] [TIEMPO]"
-        fi
+        [ -f "udpflood.go" ] && echo "   • udpflood (Go)"
+        [ -f "raknet.go" ] && echo "   • raknet (Go)"
 
         echo ""
-        echo "⚡ INICIANDO BOT..."
-        echo "El bot se ejecutará hasta el límite de GitHub (~6h)"
-        echo ""
+        echo "🚀 INICIANDO bot.py..."
+        echo "========================================"
 
-        # Ejecutar bot
+        # Ejecutar bot.py (KEYS ya está como variable de entorno)
         python3 bot.py
 
         echo ""
         echo "========================================"
-        echo "BOT DETENIDO - Hora: $(date)"
+        echo "🤖 BOT FINALIZADO"
         echo "========================================"
