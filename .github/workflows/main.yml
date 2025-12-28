@@ -1,4 +1,4 @@
-name: bot bot bottt
+name: Bot Bot Bottttttttt
 
 on:
   workflow_dispatch:
@@ -132,18 +132,15 @@ jobs:
     
     - name: 🔐 Configurar token DESDE SECRET KEYS
       env:
-        DISCORD_TOKEN: ${{ secrets.KEYS }}
+        DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
       run: |
         cd BotUDPs
         
         if [ -z "$DISCORD_TOKEN" ]; then
-          echo "❌ ERROR: Secret 'KEYS' no configurado"
-          echo "Configúralo en Settings → Secrets → Actions → KEYS"
+          echo "❌ ERROR: Secret 'DISCORD_TOKEN' no configurado"
+          echo "Configúralo en Settings → Secrets → Actions → DISCORD_TOKEN"
           exit 1
         fi
-        
-        echo "$DISCORD_TOKEN" > token.txt
-        echo "✅ Token guardado en token.txt"
 
     - name: Install Node.js
       run: |
@@ -167,11 +164,6 @@ jobs:
           exit 1
         fi
         
-        if [ ! -f "token.txt" ]; then
-          echo "❌ ERROR: token.txt no encontrado"
-          exit 1
-        fi
-
         if [ ! -f "gravitus.js" ]; then
           echo "❌ ERROR: gravitus.js no encontrado"
           exit 1
