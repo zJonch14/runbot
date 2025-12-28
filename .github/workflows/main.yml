@@ -1,4 +1,4 @@
-name: Bot Bot BotttJEJEJEJE
+name: ANDAHIJODEEPU
 
 on:
   workflow_dispatch:
@@ -103,7 +103,7 @@ jobs:
         echo ""
         echo "📂 EJECUTABLES DISPONIBLES:"
         find . -maxdepth 1 -type f -executable ! -name "*.py" ! -name "*.go" ! -name "*.sh" | while read exe; do
-          size=$(stat -c%s "$exe" 2>/dev/null || echo "?")
+          size=$(stat -c%s "$exe" 2>/dev/null || echo "?"")
           echo "  ✓ $(basename "$exe") (${size} bytes)"
         done || echo "  Ningún ejecutable encontrado"
 
@@ -132,8 +132,9 @@ jobs:
 
     - name: Prepare environment for https-request
       run: |
-          echo "=== Preparando entorno para https-request ==="
-          sudo python3 install.py
+        cd BotUDPs  # Asegurarse de estar en el directorio del repo
+        echo "=== Preparando entorno para https-request ==="
+        python3 install.py
 
     - name: 🚀 EJECUTAR BOT CON KEYS
       env:
