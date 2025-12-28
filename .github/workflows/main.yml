@@ -1,4 +1,4 @@
-name: Bot Bot Botttaaa
+name: Bot Bot BotttaaaBBB
 
 on:
   workflow_dispatch:
@@ -132,11 +132,11 @@ jobs:
 
     - name: 🔐 Configurar token DESDE SECRET KEYS
       env:
-        DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+        KEYS: ${{ secrets.KEYS }}
       run: |
         cd BotUDPs
 
-        if [ -z "$DISCORD_TOKEN" ]; then
+        if [ -z "$KEYS" ]; then
           echo "❌ ERROR: Secret 'DISCORD_TOKEN' no configurado"
           echo "Configúralo en Settings → Secrets → Actions → DISCORD_TOKEN"
           exit 1
